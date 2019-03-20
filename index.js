@@ -1,57 +1,51 @@
-"use strict"
-
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const UsersService = require('./UsersService');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
-const UsersService = require('./UsersService');
 
-const usersService = new UsersService();
-app.use(express.static(`${__dirname}/public`));
+const userService = new UsersService();
 
-app.get('/', (req, res) => {
-    res.sendFile(`${__dirname}/index.html`);
+app.use(express.static(__dirname + '/public'));
+
+app.get('/', function (req, res) {
+    res.sendFile(__dirname + '/index.html');
 });
 
-io.on('connection', (socket) => {
-    // klient nasłuchuje na wiadomość wejścia do czatu
-    socket.on('join', (name) => {
-        // użytkownika, który pojawił się w aplikacji, zapisujemy do serwisu trzymającego listę osób w czacie
-        usersService.addUser({
+io.on('connection', function (socket) {
+
+    socket.on('join', function (name) {
+        userService.addUser({
             id: socket.id,
             name
         });
-        // aplikacja emituje zdarzenie update, które aktualizuje informację na temat listy użytkowników każdemu nasłuchującemu na wydarzenie 'update'
         io.emit('update', {
-            users: usersService.getAllUsers()
+            users: userService.getAllUsers()
         });
     });
-});
 
-io.on('connection', (socket) => {
-    socket.on('disconnect', () => {
-        usersService.removeUser(socket.id);
-        socket.broadcast.emit('update', {
-            users: usersService.getAllUsers()
-        });
-    });
-});
-io.on('connection', (socket) => {
-    socket.on('message', (message) => {
+    socket.on('message', function (message) {
         const {
             name
-        } = usersService.getUserById(socket.id);
+        } = userService.getUserById(socket.id);
         socket.broadcast.emit('message', {
             text: message.text,
             from: name
         });
     });
+
+    socket.on('disconnect', () => {
+        userService.removeUser(socket.id);
+        socket.broadcast.emit('update', {
+            users: userService.getAllUsers()
+        });
+    });
+
 });
 
-
-server.listen(3000, () => {
+server.listen(3000, function () {
     console.log('listening on *:3000');
 });
